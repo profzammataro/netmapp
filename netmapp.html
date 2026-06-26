@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetMapp — Primo Piano</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0f1923;
+    color: #e8edf2;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 28px;
+    background: #161f2b;
+    border-bottom: 1px solid #1e2d3d;
+    flex-wrap: wrap;
+  }
+
+  header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    color: #e8edf2;
+  }
+
+  header .badge {
+    font-size: .85rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 5px;
+    background: #1e3a5f;
+    color: #5ba3f5;
+  }
+
+  .floor-tabs {
+    display: flex;
+    gap: 6px;
+    background: #0f1923;
+    border-radius: 10px;
+    padding: 4px;
+  }
+  .floor-tab {
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 10px 18px;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    color: #8a9bb0;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .floor-tab:hover { color: #e8edf2; }
+  .floor-tab.active { background: #1e3a5f; color: #5ba3f5; }
+
+  .legend {
+    display: flex;
+    gap: 22px;
+    margin-left: auto;
+    align-items: center;
+    font-size: 1rem;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #8a9bb0;
+  }
+
+  .dot {
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot.ok   { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
+  .dot.ko   { background: #ef4444; box-shadow: 0 0 6px #ef444488; }
+  .dot.unkn { background: #64748b; }
+
+  /* admin toggle */
+  .admin-btn {
+    margin-left: 12px;
+    font-size: .95rem;
+    font-weight: 700;
+    padding: 9px 18px;
+    border-radius: 8px;
+    border: 1px solid #2a3f58;
+    background: transparent;
+    color: #8a9bb0;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .admin-btn.active {
+    background: #1e3a5f;
+    color: #5ba3f5;
+    border-color: #5ba3f5;
+  }
+
+  .map-container {
+    flex: 1;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    overflow: auto;
+  }
+
+  .map-wrapper {
+    position: relative;
+    display: inline-block;
+    user-select: none;
+  }
+
+  .map-wrapper img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid #1e2d3d;
+  }
+
+  /* SVG overlay */
+  .map-wrapper svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  .room-zone {
+    fill: transparent;
+    stroke: transparent;
+    cursor: pointer;
+    transition: fill .15s;
+  }
+  .room-zone:hover { fill: rgba(91,163,245,.18); stroke: #5ba3f5; stroke-width: 1.5; }
+  .room-zone.ok    { fill: rgba(34,197,94,.13);  stroke: #22c55e; stroke-width: 1.5; }
+  .room-zone.ko    { fill: rgba(239,68,68,.13);  stroke: #ef4444; stroke-width: 1.5; }
+  .room-zone.partial { fill: rgba(234,179,8,.13); stroke: #eab308; stroke-width: 1.5; }
+
+  /* status dot overlay on rooms */
+  .room-dot {
+    pointer-events: none;
+  }
+
+  /* Popup */
+  #popup {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    background: #161f2b;
+    border: 1px solid #1e2d3d;
+    border-radius: 12px;
+    padding: 0;
+    min-width: 260px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.55);
+    overflow: hidden;
+  }
+
+  .popup-header {
+    padding: 14px 18px 12px;
+    background: #1a2738;
+    border-bottom: 1px solid #1e2d3d;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .popup-header h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #e8edf2;
+  }
+
+  .popup-close {
+    background: none;
+    border: none;
+    color: #4a6078;
+    cursor: pointer;
+    font-size: 1.2rem;
+    line-height: 1;
+    padding: 0 2px;
+    transition: color .15s;
+  }
+  .popup-close:hover { color: #e8edf2; }
+
+  .popup-body { padding: 16px 18px; }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #1e2d3d;
+  }
+  .status-row:last-child { border-bottom: none; }
+
+  .status-label {
+    font-size: .85rem;
+    color: #8a9bb0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status-label svg { width:16px; height:16px; flex-shrink:0; }
+
+  .status-pill {
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+  }
+  .pill-ok   { background: #14532d; color: #22c55e; }
+  .pill-ko   { background: #450a0a; color: #ef4444; }
+  .pill-unkn { background: #1e2d3d; color: #64748b; }
+
+  /* Toggle switch for admin mode */
+  .toggle-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toggle {
+    position: relative;
+    width: 36px; height: 20px;
+    cursor: pointer;
+  }
+  .toggle input { opacity:0; width:0; height:0; }
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background: #1e2d3d;
+    transition: background .2s;
+  }
+  .toggle input:checked + .toggle-track { background: #22c55e; }
+  .toggle-thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform .2s;
+  }
+  .toggle input:checked ~ .toggle-thumb { transform: translateX(16px); }
+
+  .popup-admin { padding: 14px 18px; border-top: 1px solid #1e2d3d; background: #111820; }
+  .popup-admin-title { font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #4a6078; margin-bottom: 12px; }
+
+  .save-btn {
+    width: 100%;
+    margin-top: 10px;
+    padding: 9px;
+    border-radius: 7px;
+    border: none;
+    background: #1e3a5f;
+    color: #5ba3f5;
+    font-weight: 700;
+    font-size: .85rem;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .save-btn:hover { background: #2a4f7a; }
+
+  .saving-msg {
+    text-align: center;
+    font-size: .75rem;
+    color: #22c55e;
+    margin-top: 6px;
+    min-height: 16px;
+  }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: #1a2738;
+    border: 1px solid #22c55e44;
+    color: #22c55e;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: .82rem;
+    font-weight: 600;
+    transition: transform .3s;
+    z-index: 200;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  .admin-badge {
+    display: none;
+    font-size: .85rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 5px 11px;
+    border-radius: 6px;
+    background: #3d2000;
+    color: #f59e0b;
+    margin-left: 8px;
+  }
+  body.admin-mode .admin-badge { display: inline-block; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏫 NetMapp</h1>
+  <div class="floor-tabs" id="floorTabs">
+    <button class="floor-tab active" data-floor="terra" onclick="switchFloor('terra')">Piano Terra</button>
+    <button class="floor-tab" data-floor="primo" onclick="switchFloor('primo')">Primo Piano</button>
+    <button class="floor-tab" data-floor="secondo" onclick="switchFloor('secondo')">Secondo Piano</button>
+  </div>
+  <span class="admin-badge">✏️ Modalità Admin</span>
+  <div class="legend">
+    <div class="legend-item"><span class="dot ok"></span> Tutto OK</div>
+    <div class="legend-item"><span class="dot ko"></span> Problema</div>
+    <div class="legend-item"><span class="dot unkn"></span> Non rilevato</div>
+    <button class="admin-btn" id="adminToggle" onclick="toggleAdmin()">Admin</button>
+  </div>
+</header>
+
+<div class="map-container">
+  <div class="map-wrapper" id="mapWrapper">
+    <img src="https://profzammataro.github.io/netmapp/pianoterra.png" alt="Planimetria" id="mapImg" onload="initMap()">
+    <svg id="overlay" viewBox="0 0 0 0" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+</div>
+
+<!-- Popup -->
+<div id="popup">
+  <div class="popup-header">
+    <h2 id="popupTitle">Aula 101</h2>
+    <button class="popup-close" onclick="closePopup()">✕</button>
+  </div>
+  <div class="popup-body">
+    <div class="status-row">
+      <span class="status-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+        Rete
+      </span>
+      <span class="status-pill" id="netStatus">—</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        HDMI / LIM
+      </span>
+      <span class="status-pill" id="hdmiStatus">—</span>
+    </div>
+    <div id="notesDisplay" style="display:none; margin-top:10px; padding:10px 12px; background:#1a2738; border-radius:7px; font-size:.8rem; color:#b8c4d4; line-height:1.4;"></div>
+  </div>
+  <div class="popup-admin" id="popupAdmin" style="display:none">
+    <div class="popup-admin-title">Aggiorna stato</div>
+    <div class="status-row">
+      <span class="status-label">Rete</span>
+      <div class="toggle-wrap">
+        <span style="font-size:.75rem;color:#4a6078">No</span>
+        <label class="toggle">
+          <input type="checkbox" id="netToggle">
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+        <span style="font-size:.75rem;color:#4a6078">OK</span>
+      </div>
+    </div>
+    <div class="status-row">
+      <span class="status-label">HDMI / LIM</span>
+      <div class="toggle-wrap">
+        <span style="font-size:.75rem;color:#4a6078">No</span>
+        <label class="toggle">
+          <input type="checkbox" id="hdmiToggle">
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+        <span style="font-size:.75rem;color:#4a6078">OK</span>
+      </div>
+    </div>
+    <div class="field" style="margin-top:8px">
+      <label style="display:block;font-size:.72rem;color:#4a6078;margin-bottom:4px">Note (es. "problema pc", "lim no touch")</label>
+      <textarea id="notesInput" rows="2" placeholder="Aggiungi una nota…" style="width:100%;padding:8px 10px;background:#0f1923;border:1px solid #1e2d3d;border-radius:6px;color:#e8edf2;font-size:.82rem;font-family:inherit;resize:vertical"></textarea>
+    </div>
+    <button class="save-btn" onclick="saveRoom()">💾 Salva</button>
+    <div class="saving-msg" id="savingMsg"></div>
+  </div>
+</div>
+
+<div id="toast">✓ Salvato</div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAO6Mhj1AvS0PBoOh5R4hMEBjI8O5vKuVY",
+  authDomain: "beachmap-36cab.firebaseapp.com",
+  databaseURL: "https://beachmap-36cab-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "beachmap-36cab",
+  storageBucket: "beachmap-36cab.firebasestorage.app",
+  messagingSenderId: "424227860046",
+  appId: "1:424227860046:web:a520e567d7b83fbbccdd1f"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+const ROOT = "netmapp/aule";
+
+// expose to window so non-module scripts can call them
+window._fbSet = (roomId, data) => set(ref(db, `${ROOT}/${roomId}`), data);
+
+window._fbListen = (cb) => {
+  onValue(ref(db, ROOT), snap => {
+    cb(snap.exists() ? snap.val() : {});
+  });
+};
+
+// Segnala che Firebase è pronto, anche se l'immagine ha già finito di caricare
+window._fbReady = true;
+if (typeof window._onFbReady === "function") window._onFbReady();
+</script>
+
+<script>
+// ─── Room definitions ───────────────────────────────────────────────────────
+// Coordinates as percentages of image natural size (x%, y%, w%, h%)
+// Measured from the planimetria. Tune if needed.
+const FLOORS = {
+  terra: {
+    label: "Piano Terra",
+    img: "https://profzammataro.github.io/netmapp/pianoterra.png",
+    rooms: [
+      { id:"014", label:"Aula 014", x:27.1, y:31.3, w:6.0, h:7.0 },
+      { id:"013", label:"Aula 013", x:33.7, y:31.4, w:6.0, h:7.0 },
+      { id:"aulamagna", label:"Aula Magna", x:34.3, y:47.8, w:6.0, h:7.0 },
+      { id:"presidenza", label:"Presidenza", x:27.2, y:56.3, w:6.0, h:7.0 },
+      { id:"dsga", label:"D.S.G.A.", x:35.4, y:58.3, w:6.0, h:7.0 },
+      { id:"biblioteca", label:"Biblioteca", x:10.8, y:61.5, w:6.0, h:7.0 },
+      { id:"personale", label:"Personale", x:34.3, y:62.6, w:6.0, h:7.0 },
+      { id:"didattica", label:"Didattica", x:33.6, y:66.4, w:6.0, h:7.0 },
+      { id:"vicepresid", label:"Vice Presidenza", x:30.0, y:80.8, w:6.0, h:7.0 },
+      { id:"saladocenti", label:"Sala Docenti", x:34.2, y:81.2, w:6.0, h:7.0 },
+      { id:"bar", label:"Bar", x:40.8, y:78.8, w:6.0, h:7.0 },
+      { id:"memoria", label:"Muro della Memoria", x:45.0, y:75.1, w:6.0, h:7.0 },
+      { id:"musica", label:"Musica", x:51.7, y:77.9, w:6.0, h:7.0 },
+      { id:"deposito", label:"Deposito", x:68.1, y:79.6, w:6.0, h:7.0 },
+      { id:"astronomia", label:"Museo Astronomia", x:74.9, y:78.4, w:6.0, h:7.0 },
+      { id:"linux", label:"Linux", x:81.1, y:73.1, w:6.0, h:7.0 },
+      { id:"ecdl", label:"ECDL", x:88.0, y:72.7, w:6.0, h:7.0 },
+    ]
+  },
+  primo: {
+    label: "Primo Piano",
+    img: "https://profzammataro.github.io/netmapp/primopiano.png",
+    rooms: [
+      { id:"127", label:"Aula 127", x:15.4, y:3.9, w:6.0, h:7.0 },
+      { id:"129", label:"Aula 129", x:22.1, y:4.3, w:6.0, h:7.0 },
+      { id:"130", label:"Aula 130", x:28.6, y:4.6, w:6.0, h:7.0 },
+      { id:"125", label:"Aula 125", x:11.1, y:11.9, w:6.0, h:7.0 },
+      { id:"124", label:"Deposito 124", x:16.8, y:12.8, w:6.0, h:7.0 },
+      { id:"126", label:"Aula 126", x:21.7, y:14.2, w:6.0, h:7.0 },
+      { id:"128", label:"Aula 128", x:27.8, y:13.4, w:6.0, h:7.0 },
+      { id:"123", label:"Aula 123", x:10.8, y:18.8, w:6.0, h:7.0 },
+      { id:"122", label:"Aula 122", x:17.4, y:19.9, w:6.0, h:7.0 },
+      { id:"121", label:"Aula 121", x:10.9, y:25.3, w:6.0, h:7.0 },
+      { id:"120", label:"Aula 120", x:17.9, y:28.8, w:6.0, h:7.0 },
+      { id:"118", label:"Aula 118", x:17.3, y:35.5, w:6.0, h:7.0 },
+      { id:"116", label:"Aula 116", x:17.8, y:46.0, w:6.0, h:7.0 },
+      { id:"114", label:"Aula 114", x:17.6, y:55.0, w:6.0, h:7.0 },
+      { id:"119", label:"Aula 119", x:11.0, y:56.6, w:6.0, h:7.0 },
+      { id:"117", label:"Aula 117", x:10.6, y:64.0, w:6.0, h:7.0 },
+      { id:"112", label:"Aula 112", x:17.5, y:63.4, w:6.0, h:7.0 },
+      { id:"110", label:"Aula 110", x:22.0, y:69.0, w:6.0, h:7.0 },
+      { id:"108", label:"Aula 108", x:28.9, y:69.0, w:6.0, h:7.0 },
+      { id:"107", label:"Aula 107", x:35.8, y:69.0, w:6.0, h:7.0 },
+      { id:"106", label:"Aula 106", x:42.2, y:69.1, w:6.0, h:7.0 },
+      { id:"105", label:"Aula 105", x:48.5, y:69.0, w:4.5, h:7.0 },
+      { id:"104", label:"Aula 104", x:56.0, y:68.9, w:6.0, h:7.0 },
+      { id:"102", label:"Aula 102", x:62.5, y:68.7, w:6.0, h:7.0 },
+      { id:"101", label:"Aula 101", x:69.2, y:69.0, w:6.0, h:7.0 },
+      { id:"113", label:"Aula 113", x:28.9, y:76.4, w:6.0, h:7.0 },
+      { id:"111", label:"Aula 111", x:14.2, y:77.6, w:6.0, h:7.0 },
+      { id:"109", label:"Aula 109", x:21.5, y:78.0, w:6.0, h:7.0 },
+      { id:"103", label:"Aula 103", x:63.6, y:82.4, w:6.0, h:7.0 },
+    ]
+  },
+  secondo: {
+    label: "Secondo Piano",
+    img: "https://profzammataro.github.io/netmapp/secondopiano.png",
+    rooms: [
+      { id:"223", label:"Aula 223", x:13.8, y:2.7, w:6.0, h:7.0 },
+      { id:"225", label:"Aula 225", x:20.9, y:2.5, w:6.0, h:7.0 },
+      { id:"227", label:"Aula 227", x:27.8, y:2.7, w:6.0, h:7.0 },
+      { id:"226", label:"Aula 226", x:20.9, y:12.0, w:6.0, h:7.0 },
+      { id:"228", label:"Aula 228", x:28.1, y:10.8, w:6.0, h:7.0 },
+      { id:"224", label:"Aula 224", x:16.5, y:17.4, w:6.0, h:7.0 },
+      { id:"221", label:"Aula 221", x:9.4, y:15.7, w:6.0, h:7.0 },
+      { id:"219", label:"Aula 219", x:9.7, y:23.4, w:6.0, h:7.0 },
+      { id:"222", label:"Aula 222", x:16.8, y:23.3, w:6.0, h:7.0 },
+      { id:"220", label:"Aula 220", x:16.7, y:31.3, w:6.0, h:7.0 },
+      { id:"218", label:"Aula 218", x:17.0, y:40.7, w:6.0, h:7.0 },
+      { id:"216", label:"Aula 216 AAIRC", x:17.8, y:47.4, w:6.0, h:7.0 },
+      { id:"217", label:"Aula 217", x:8.8, y:57.6, w:6.0, h:7.0 },
+      { id:"214", label:"Aula 214", x:16.1, y:55.3, w:6.0, h:7.0 },
+      { id:"215", label:"Aula 215", x:9.0, y:66.5, w:6.0, h:7.0 },
+      { id:"212", label:"Aula 212", x:15.7, y:63.7, w:6.0, h:7.0 },
+      { id:"213", label:"Aula 213", x:13.4, y:77.9, w:6.0, h:7.0 },
+      { id:"211", label:"Aula 211", x:20.9, y:77.9, w:6.0, h:7.0 },
+      { id:"209", label:"Aula 209", x:21.1, y:69.7, w:6.0, h:7.0 },
+      { id:"210", label:"Aula 210", x:27.5, y:69.1, w:6.0, h:7.0 },
+      { id:"208", label:"Aula 208", x:34.5, y:69.4, w:6.0, h:7.0 },
+      { id:"207", label:"Aula 207", x:41.0, y:69.6, w:6.0, h:7.0 },
+      { id:"206", label:"Aula 206", x:49.1, y:68.8, w:6.0, h:7.0 },
+      { id:"205", label:"Aula 205", x:55.6, y:69.4, w:6.0, h:7.0 },
+      { id:"204", label:"Aula 204", x:63.2, y:69.8, w:6.0, h:7.0 },
+      { id:"202", label:"Aula 202", x:68.6, y:70.4, w:6.0, h:7.0 },
+      { id:"201", label:"Aula 201", x:75.0, y:70.0, w:6.0, h:7.0 },
+      { id:"203", label:"Laboratorio Chimica", x:63.8, y:86.3, w:6.0, h:7.0 },
+    ]
+  }
+};
+
+let currentFloor = "terra";
+let ROOMS = FLOORS[currentFloor].rooms;
+
+let roomData    = {};   // from Firebase
+let currentRoom = null;
+let adminMode   = false;
+let mapW = 0, mapH = 0;
+
+// ─── Init map overlay ────────────────────────────────────────────────────────
+let fbUnsub = null;
+
+function initMap() {
+  const img = document.getElementById("mapImg");
+  mapW = img.naturalWidth;
+  mapH = img.naturalHeight;
+  const svg = document.getElementById("overlay");
+  svg.setAttribute("viewBox", `0 0 ${mapW} ${mapH}`);
+  svg.innerHTML = "";
+
+  ROOMS.forEach(r => {
+    const rx = r.x / 100 * mapW;
+    const ry = r.y / 100 * mapH;
+    const rw = r.w / 100 * mapW;
+    const rh = r.h / 100 * mapH;
+
+    const g = document.createElementNS("http://www.w3.org/2000/svg","g");
+    g.setAttribute("id","zone_"+r.id);
+
+    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x", rx); rect.setAttribute("y", ry);
+    rect.setAttribute("width", rw); rect.setAttribute("height", rh);
+    rect.setAttribute("rx","4");
+    rect.setAttribute("class","room-zone");
+    rect.addEventListener("click", e => openPopup(r.id, e));
+
+    // status indicator dot (top-right corner of zone)
+    const circle = document.createElementNS("http://www.w3.org/2000/svg","circle");
+    circle.setAttribute("cx", rx + rw - 6);
+    circle.setAttribute("cy", ry + 6);
+    circle.setAttribute("r","5");
+    circle.setAttribute("class","room-dot");
+    circle.setAttribute("id","dot_"+r.id);
+    circle.setAttribute("fill","#334155");
+
+    g.appendChild(rect);
+    g.appendChild(circle);
+    svg.appendChild(g);
+  });
+
+  // start listening (single shared listener on netmapp/aule covers all floors)
+  attachFirebaseListener();
+}
+window.initMap = initMap;
+
+function attachFirebaseListener() {
+  if (fbUnsub) { updateAllZones(); return; }
+
+  if (window._fbReady && window._fbListen) {
+    window._fbListen(data => {
+      roomData = data || {};
+      updateAllZones();
+    });
+    fbUnsub = true;
+  } else {
+    // Firebase module non ancora pronto: riprova quando lo sarà
+    window._onFbReady = () => {
+      window._fbListen(data => {
+        roomData = data || {};
+        updateAllZones();
+      });
+      fbUnsub = true;
+    };
+  }
+}
+
+function switchFloor(floorKey) {
+  if (!FLOORS[floorKey] || floorKey === currentFloor) {
+    // still allow re-click to do nothing harmful
+  }
+  currentFloor = floorKey;
+  ROOMS = FLOORS[floorKey].rooms;
+
+  // update tab active state
+  document.querySelectorAll(".floor-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.floor === floorKey);
+  });
+
+  // swap image (initMap runs again on load via onload handler)
+  closePopup();
+  const img = document.getElementById("mapImg");
+  img.src = FLOORS[floorKey].img;
+
+  // update document title badge area if present
+  document.title = "NetMapp — " + FLOORS[floorKey].label;
+}
+window.switchFloor = switchFloor;
+
+function updateAllZones() {
+  ROOMS.forEach(r => {
+    const d    = roomData[r.id] || {};
+    const rect = document.querySelector(`#zone_${r.id} rect`);
+    const dot  = document.getElementById("dot_"+r.id);
+    if (!rect) return;
+
+    rect.classList.remove("ok","ko","partial");
+    const net  = d.net;
+    const hdmi = d.hdmi;
+
+    if (net === undefined && hdmi === undefined) {
+      dot.setAttribute("fill","#334155");
+    } else if (net && hdmi) {
+      rect.classList.add("ok"); dot.setAttribute("fill","#22c55e");
+    } else if (!net && !hdmi) {
+      rect.classList.add("ko"); dot.setAttribute("fill","#ef4444");
+    } else {
+      rect.classList.add("partial"); dot.setAttribute("fill","#eab308");
+    }
+  });
+}
+
+// ─── Popup ───────────────────────────────────────────────────────────────────
+function openPopup(roomId, evt) {
+  currentRoom = roomId;
+  const room = ROOMS.find(r => r.id === roomId);
+  const d    = roomData[roomId] || {};
+
+  document.getElementById("popupTitle").textContent = room ? room.label : "Aula " + roomId;
+  setStatusPill("netStatus",  d.net);
+  setStatusPill("hdmiStatus", d.hdmi);
+
+  // notes display (visible to everyone if present)
+  const notesEl = document.getElementById("notesDisplay");
+  if (d.notes && d.notes.trim()) {
+    notesEl.style.display = "block";
+    notesEl.textContent = "📝 " + d.notes;
+  } else {
+    notesEl.style.display = "none";
+  }
+
+  // admin panel
+  const adminPanel = document.getElementById("popupAdmin");
+  if (adminMode) {
+    adminPanel.style.display = "block";
+    document.getElementById("netToggle").checked  = !!d.net;
+    document.getElementById("hdmiToggle").checked = !!d.hdmi;
+    document.getElementById("notesInput").value   = d.notes || "";
+    document.getElementById("savingMsg").textContent = "";
+  } else {
+    adminPanel.style.display = "none";
+  }
+
+  // position popup near click
+  const popup = document.getElementById("popup");
+  popup.style.display = "block";
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let x = evt.clientX + 14, y = evt.clientY - 20;
+  if (x + 280 > vw) x = evt.clientX - 280 - 14;
+  if (y + popup.offsetHeight + 10 > vh) y = vh - popup.offsetHeight - 10;
+  popup.style.left = Math.max(8, x) + "px";
+  popup.style.top  = Math.max(8, y) + "px";
+}
+window.openPopup = openPopup;
+
+function setStatusPill(elId, val) {
+  const el = document.getElementById(elId);
+  el.className = "status-pill";
+  if (val === true)       { el.classList.add("pill-ok");   el.textContent = "✓ OK"; }
+  else if (val === false) { el.classList.add("pill-ko");   el.textContent = "✗ KO"; }
+  else                    { el.classList.add("pill-unkn"); el.textContent = "—";    }
+}
+
+function closePopup() {
+  document.getElementById("popup").style.display = "none";
+  currentRoom = null;
+}
+window.closePopup = closePopup;
+
+// click outside
+document.addEventListener("click", e => {
+  const popup = document.getElementById("popup");
+  if (popup.style.display === "block" &&
+      !popup.contains(e.target) &&
+      !e.target.closest(".room-zone")) {
+    closePopup();
+  }
+});
+
+// ─── Admin ───────────────────────────────────────────────────────────────────
+function toggleAdmin() {
+  adminMode = !adminMode;
+  document.body.classList.toggle("admin-mode", adminMode);
+  document.getElementById("adminToggle").classList.toggle("active", adminMode);
+  closePopup();
+}
+window.toggleAdmin = toggleAdmin;
+
+async function saveRoom() {
+  if (!currentRoom || !window._fbSet) return;
+  const net   = document.getElementById("netToggle").checked;
+  const hdmi  = document.getElementById("hdmiToggle").checked;
+  const notes = document.getElementById("notesInput").value.trim();
+  const msg   = document.getElementById("savingMsg");
+  msg.style.color = "#8a9bb0";
+  msg.textContent = "Salvataggio…";
+  try {
+    await window._fbSet(currentRoom, { net, hdmi, notes, ts: Date.now() });
+    msg.style.color = "#22c55e";
+    msg.textContent = "✓ Salvato";
+    showToast("Aula " + currentRoom + " aggiornata");
+    // refresh popup pills
+    setStatusPill("netStatus", net);
+    setStatusPill("hdmiStatus", hdmi);
+    // refresh notes display
+    const notesEl = document.getElementById("notesDisplay");
+    if (notes) {
+      notesEl.style.display = "block";
+      notesEl.textContent = "📝 " + notes;
+    } else {
+      notesEl.style.display = "none";
+    }
+  } catch(e) {
+    msg.style.color = "#ef4444";
+    msg.textContent = "Errore: " + e.message;
+  }
+}
+window.saveRoom = saveRoom;
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = "✓ " + msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2500);
+}
+
+// ─── Bfcache fix: forza reload se la pagina viene ripristinata "congelata" ───
+// Quando si torna a questa tab da un'altra app/tab, alcuni browser mobile
+// ripristinano la pagina dalla cache invece di ricaricarla: il listener
+// Firebase resta disconnesso e i dati sembrano "spariti". Forziamo un reload.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
+</script>
+</body>
+</html>
